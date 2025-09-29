@@ -8,7 +8,7 @@ Go to "My rosjects" and run the project that you created.
 In the same terminal, follow the instructions **ONE AFTER THE OTHER**:
 
 ```bash
-cd ~/catkin_ws/src && git clone https://github.com/KTBE/Mission_Coordination_project.git
+cd ~/catkin_ws/src && git clone https://github.com/2slamsala7/Mission_Coordination_project.git
 
 cd ~/catkin_ws && catkin_make && source ~/catkin_ws/devel/setup.bash
 ```
