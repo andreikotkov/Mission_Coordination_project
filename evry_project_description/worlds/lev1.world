@@ -50,5 +50,20 @@
       <name>limits</name>
       <pose>0 0 0 0 0 0</pose>
     </include>
+
+    <!-- **********************OBSTACLES**************************** -->
+
+    <include>
+      <uri>model://my_models/city</uri>
+      <name>city</name>
+      <pose>0 0 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>model://my_models/bus</uri>
+      <name>bus</name>
+      <pose>2 -8 -0.3 0 0 0</pose>
+    </include>
+
   </world>
 </sdf>
