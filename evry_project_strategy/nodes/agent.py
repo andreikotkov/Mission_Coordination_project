@@ -116,29 +116,91 @@ class Robot:
 
 
 def run_demo():
+    
     """Main loop"""
-    robot_name = rospy.get_param("~robot_name")
+    # Each node has its own private param ~robot_name (robot_1, robot_2, robot_3)
+    robot_name = rospy.get_param("~robot_name", "robot_1")
     robot = Robot(robot_name)
     print(f"Robot : {robot_name} is starting..")
 
+    # --- Sequential start based on robot index ---
+    # robot_1 -> index 1 -> delay 0 s
+    # robot_2 -> index 2 -> delay 1 s
+    # robot_3 -> index 3 -> delay 2 s
+    try:
+        robot_index = int(robot_name.split('_')[-1])
+    except ValueError:
+        robot_index = 1  # fallback if name is weird
+
+    delay_between = 2.0   # seconds between robots
+    startup_delay = (robot_index - 1) * delay_between
+    print(f"{robot_name}: waiting {startup_delay:.1f} s before starting control loop")
+    rospy.sleep(startup_delay)
+    # ---------------------------------------------
+
+    # PID gains
+    Kp = 0.8      # proportional gain
+    Ki = 0.0      # integral gain
+    Kd = 0.1      # derivative gain
+
+    integral = 0.0
+    prev_error = 0.0
+    prev_time = rospy.get_time()
+
+    flag_reached_dist = 1.0  # threshold to consider the flag reached
+
     # Timing
-
     while not rospy.is_shutdown():
-        # Strategy
-        velocity = 2
-        angle = 0
+        sonar = robot.get_sonar()  # (not used yet but available)
+
         distance = float(robot.getDistanceToFlag())
-        print(f"{robot_name} distance to flag = ", distance)
+        #print(f"{robot_name} distance to flag = {distance:.2f} m")
 
-        # Write here your strategy..
-        
+        # Time step
+        current_time = rospy.get_time()
+        dt = current_time - prev_time
+        if dt <= 0.0:
+            dt = 1e-3  # avoid division by zero
 
+        error = distance
 
-        
+        # If very close to the flag: stop completely
+        if distance < flag_reached_dist:
+            velocity = 0.0
+            angle = 0.0
+            integral = 0.0      # reset integral term
+            prev_error = error
+            prev_time = current_time
+            print(f"{robot_name}: Flag reached, stopping.")
+        else:
+            # PID terms
+            integral += error * dt
+            derivative = (error - prev_error) / dt
+
+            # PID output is desired linear speed
+            u = Kp * error + Ki * integral + Kd * derivative
+
+            # Saturate to [0, 5.0]; constraint() will clamp to [-2, 2]
+            if u < 0.0:
+                u = 0.0
+            if u > 5.0:
+                u = 5.0
+
+            velocity = u
+            angle = 0.0   # here we don't control orientation, just speed
+
+            #print(f"{robot_name}: PID speed command = {velocity:.2f} m/s")
+
+            prev_error = error
+            prev_time = current_time
+
         # Finishing by publishing the desired speed. 
         # DO NOT TOUCH.
         robot.set_speed_angle(velocity, angle)
-        rospy.sleep(0.5)
+        rospy.sleep(0.2)
+
+
+
 
 
 if __name__ == "__main__":
