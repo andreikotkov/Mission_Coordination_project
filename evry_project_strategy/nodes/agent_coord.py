@@ -79,29 +79,22 @@ class Robot:
 
 
 def run_demo():
-    """
-    Improved obstacle avoidance with:
-      - GO_TO_GOAL
-      - AVOID_TURN   : rotate away from goal/obstacle with min angle
-      - AVOID_STRAIGHT: drive straight while keeping clearance, then back to GO_TO_GOAL
-    """
     '''
-        ███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
-    This strategy computes the *actual position of the flag* at startup using the robots pose and its initial 
-    distance-to-flag. From that moment, the robot always knows the goals (x, y) location and continuously turns 
-    to align its heading toward the goal before moving forward.
 
-    When no obstacle is detected, the robot turns toward the goal direction (if needed) and then drives straight 
+    ███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+    This strategy computes the *actual position of the flag* at startup using the robots pose and its initial
+    distance-to-flag. From that moment, the robot always knows the goals (x, y) location and continuously turns
+    to align its heading toward the goal before moving forward.
+    When no obstacle is detected, the robot turns toward the goal direction (if needed) and then drives straight
     toward it. This ensures that movement is always directed along the shortest geometric path to the destination.
 
     When an obstacle is detected by the sonar, the robot enters a structured two-step avoidance maneuver:
       1) AVOID_TURN:
-           It rotates *away from the goal* by at least a minimal angle, guaranteeing it turns outward and not 
+           It rotates *away from the goal* by at least a minimal angle, guaranteeing it turns outward and not
            into narrow gaps between obstacles.
       2) AVOID_STRAIGHT:
            It then drives straight for a short, predefined distance to bypass the obstacle laterally.  
            If the sonar becomes too close again, it adds a small outward turn while moving.
-
     After completing the bypass, the robot reorients toward the goal and resumes normal motion.  
     ███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
 
@@ -111,13 +104,18 @@ def run_demo():
     robot = Robot(robot_name)
     print(f"{robot_name}: starting improved avoidance planner")
 
-    # staggered start
+    # staggered start so they don't all jump at once
     try:
         robot_index = int(robot_name.split('_')[-1])
     except ValueError:
         robot_index = 1
     delay_between = 0.5
     rospy.sleep((robot_index - 1) * delay_between)
+
+    # per-robot side preference:
+    #   odd robots  -> -1.0  (prefer turning right)
+    #   even robots -> +1.0  (prefer turning left)
+    avoid_turn_preference = 1.0 if (robot_index % 2) == 0 else -1.0
 
     def normalize_angle(a):
         while a > math.pi:
@@ -126,23 +124,26 @@ def run_demo():
             a += 2.0 * math.pi
         return a
 
-    # --- control parameters (TUNED FOR SMALLER DETOUR) ---
+    # --- control parameters ---
     angle_tol = 0.15          # [rad] heading tolerance (~9°)
     max_ang_speed = 1.0       # [rad/s]
-    v_goal = 1.5              # [m/s] speed toward goal
-    v_avoid = 1.0             # [m/s] speed while bypassing
-    omega_turn = 0.8          # [rad/s] angular speed when turning in place
+    v_goal = 1.2              # [m/s] speed toward goal
+    v_avoid = 0.9             # [m/s] speed while bypassing
+    v_backup = 0.8            # [m/s] backward speed in ESCAPE_BACKUP
+    omega_turn = 0.9          # [rad/s] angular speed when turning in place
     k_ang = 2.0               # heading P gain
     goal_reached_dist = 1.0   # [m] stop when closer than this
 
-    d_block = 3.0             # [m] sonar < d_block => obstacle in front
-    d_clear = 3.3             # [m] sonar > d_clear => front considered clear (slightly reduced)
-    danger_close = 1.0        # [m] too close during straight bypass (reduced)
+    d_block = 4.0             # [m] sonar < d_block => obstacle in front
+    d_clear = 4.5             # [m] sonar > d_clear => front considered clear
+    danger_close = 1.5        # [m] close during bypass
+    emergency_close = 0.8     # [m] VERY close -> ESCAPE_BACKUP
 
-    bypass_dist = 2.0         # [m] distance to drive in AVOID_STRAIGHT (reduced from 3.0)
-    min_turn_angle = math.radians(25.0)  # [rad] minimum angle in AVOID_TURN (reduced from 45°)
+    bypass_dist = 2.0         # [m] distance to drive in AVOID_STRAIGHT
+    min_turn_angle = math.radians(25.0)  # [rad] minimum angle in AVOID_TURN
+    backup_dist = 1.0         # [m] distance to back up in ESCAPE_BACKUP
 
-    # --- compute goal position once ---
+    # --- compute goal position once from initial distance-to-flag ---
     rospy.sleep(1.0)
 
     d0 = float(robot.getDistanceToFlag())
@@ -157,13 +158,16 @@ def run_demo():
     )
 
     # --- state machine ---
-    state = "GO_TO_GOAL"        # or "AVOID_TURN", "AVOID_STRAIGHT"
+    state = "GO_TO_GOAL"        #  "AVOID_TURN", "AVOID_STRAIGHT", "ESCAPE_BACKUP"
 
     avoid_turn_dir = 1.0        # set dynamically
     yaw_turn_start = 0.0
 
     avoid_straight_start_x = 0.0
     avoid_straight_start_y = 0.0
+
+    backup_start_x = 0.0
+    backup_start_y = 0.0
 
     rate = rospy.Rate(10)  # 10 Hz
 
@@ -184,6 +188,17 @@ def run_demo():
             rate.sleep()
             continue
 
+        # --- emergency close range -> ESCAPE_BACKUP ---
+        # If something gets really close in front (another robot or a post),
+        # we don't just stop; we back out and then try again.
+        if sonar > 0.0 and sonar < emergency_close and state != "ESCAPE_BACKUP":
+            state = "ESCAPE_BACKUP"
+            backup_start_x = x
+            backup_start_y = y
+            # keep previous avoidance direction or use preference
+            avoid_turn_dir = avoid_turn_preference
+            print(f"{robot_name}: ESCAPE_BACKUP triggered (sonar={sonar:.2f} m)")
+
         obstacle_in_front = (sonar > 0.0 and sonar < d_block)
         front_clear = (sonar <= 0.0) or (sonar > d_clear)
 
@@ -195,8 +210,14 @@ def run_demo():
         # ==============================
         if state == "GO_TO_GOAL":
             if obstacle_in_front:
-                # turn direction AWAY from goal
-                avoid_turn_dir = -1.0 if heading_error > 0.0 else 1.0
+                # Start from per-robot preference (even/odd robots differ)
+                avoid_turn_dir = avoid_turn_preference
+
+                # If that preference would rotate us *towards* the goal heading,
+                # flip it, so we don't cut directly back into the center line.
+                if heading_error * avoid_turn_dir > 0.0:
+                    avoid_turn_dir *= -1.0
+
                 yaw_turn_start = yaw
                 print(
                     f"{robot_name}: obstacle at {sonar:.2f} m "
@@ -224,7 +245,7 @@ def run_demo():
 
             rotated = abs(normalize_angle(yaw - yaw_turn_start))
 
-            # front clear AND we have turned at least the (smaller) minimum angle
+            # front clear AND we have turned at least the minimum angle
             if front_clear and rotated > min_turn_angle:
                 print(
                     f"{robot_name}: front clear (sonar={sonar:.2f}), "
@@ -238,7 +259,7 @@ def run_demo():
 
         elif state == "AVOID_STRAIGHT":
             traveled = math.hypot(x - avoid_straight_start_x,
-                                   y - avoid_straight_start_y)
+                                  y - avoid_straight_start_y)
 
             # keep some safety if we see something very close
             if sonar > 0.0 and sonar < danger_close:
@@ -271,6 +292,24 @@ def run_demo():
                 )
                 state = "GO_TO_GOAL"
 
+        elif state == "ESCAPE_BACKUP":
+            # back away from whatever is in front, with a small turn
+            traveled_back = math.hypot(x - backup_start_x, y - backup_start_y)
+
+            if sonar > d_clear or traveled_back >= backup_dist:
+                print(
+                    f"{robot_name}: ESCAPE_BACKUP finished "
+                    f"(traveled={traveled_back:.2f} m, sonar={sonar:.2f}) "
+                    f"-> GO_TO_GOAL"
+                )
+                state = "GO_TO_GOAL"
+                vel_cmd = 0.0
+                ang_cmd = 0.0
+            else:
+                # move backwards and rotate a bit according to preference
+                vel_cmd = -v_backup
+                ang_cmd = avoid_turn_dir * (omega_turn * 0.5)
+
         else:
             print(f"{robot_name}: unknown state '{state}', resetting to GO_TO_GOAL")
             state = "GO_TO_GOAL"
@@ -279,6 +318,8 @@ def run_demo():
 
         robot.set_speed_angle(vel_cmd, ang_cmd)
         rate.sleep()
+
+
 
 
 if __name__ == "__main__":
