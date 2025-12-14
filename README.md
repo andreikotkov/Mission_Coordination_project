@@ -107,7 +107,7 @@ A purely reactive navigation strategy based on distance reduction.
 
 ### Results
 <video controls width="800">
-  <source src="https://raw.githubusercontent.com/andreikotkov/Mission_Coordination_project/main/videos/robust.mp4" type="video/mp4">
+  <source src="videos/robust.mp4" type="video/mp4">
 </video>
 
 
@@ -136,7 +136,7 @@ A deterministic strategy based on explicit goal localization.
 ### Results
 
 <video controls width="800">
-  <source src="https://raw.githubusercontent.com/andreikotkov/Mission_Coordination_project/main/videos/coord.mp4" type="video/mp4">
+  <source src="videos/coord.mp4" type="video/mp4">
 </video>
 
 
@@ -171,7 +171,7 @@ A decentralized multi-robot coordination strategy based on peer-to-peer communic
 
 ### Results
 <video controls width="800">
-  <source src="https://raw.githubusercontent.com/andreikotkov/Mission_Coordination_project/main/videos/priority.mp4" type="video/mp4">
+  <source src="videos/priority.mp4" type="video/mp4">
 </video>
 
 
@@ -200,7 +200,7 @@ An advanced navigation method based on Artificial Potential Fields with geometry
 ### Results
 
 <video controls width="800">
-  <source src="https://raw.githubusercontent.com/andreikotkov/Mission_Coordination_project/main/videos/apf.mp4" type="video/mp4">
+  <source src="videos/apf.mp4" type="video/mp4">
 </video>
 
 
@@ -218,7 +218,7 @@ To handle complex traps (e.g., trees or blind corners), the strategy implements 
 
 
 <video controls width="800">
-  <source src="https://raw.githubusercontent.com/andreikotkov/Mission_Coordination_project/main/videos/apf_cut.mp4" type="video/mp4">
+  <source src="videos/apf_cut.mp4" type="video/mp4">
 </video>
 
 
