@@ -107,7 +107,7 @@ A purely reactive navigation strategy based on distance reduction.
 
 ### Results
 
-<video src="videos/robust.mp4" controls width="800"></video>
+https://github.com/user-attachments/assets/1bec0dd6-e7b1-4378-8e5d-4a4810904105
 
 
 ---
@@ -133,7 +133,7 @@ A deterministic strategy based on explicit goal localization.
 
 ### Results
 
-<video src="videos/coord.mp4" controls width="800"></video>
+https://github.com/user-attachments/assets/e326e5e9-e19f-45aa-9e56-888363f07a48
 
 
 
@@ -166,7 +166,7 @@ A decentralized multi-robot coordination strategy based on peer-to-peer communic
 
 ### Results
 
-<video src="videos/priority.mp4" controls width="800"></video>
+https://github.com/user-attachments/assets/b9b54d77-c8b8-4350-9d01-3fc0184b4613
 
 
 ---
@@ -192,7 +192,7 @@ An advanced navigation method based on Artificial Potential Fields with geometry
 
 ### Results
 
-<video src="videos/apf.mp4" controls width="800"></video>
+https://github.com/user-attachments/assets/c2d3ad6d-f9b4-408b-b6eb-1509304d5330
 
 ### Tactical Retreat and Scan Logic
 
@@ -207,7 +207,8 @@ To handle complex traps (e.g., trees or blind corners), the strategy implements 
    After dodging, the robot forces a short forward motion to ensure the robot’s body fully clears the obstacle.
 
 
-<video src="videos/apf_cut.mp4" controls width="800"></video>
+https://github.com/user-attachments/assets/d64f9621-806f-4b54-9a1e-184988b72ca8
+
 
 ## 📊 Strategy Comparison
 
