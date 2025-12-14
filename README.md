@@ -1,234 +1,107 @@
-# 🛰️ Mission Coordination Project (ROS1)
+# Mission Coordination Project - ROS
 
-This project explores **multi-robot autonomous navigation and coordination** in an **unknown, obstacle-rich environment** using **ROS1** and **Gazebo**.  
-Multiple navigation strategies are implemented and compared, ranging from simple reactive control to advanced Artificial Potential Fields with geometric awareness.
+**University of Évry Paris Saclay - M2 SAAS**
 
----
-
-## 📦 Environment Setup
-
-### 1) Connect to RDS
-Log in to **The Construct RDS** platform:  
-https://app.theconstructsim.com/#/
-
-Create a **ROS1 empty project (rosject)**.
-
----
-
-### 2) Clone the Repository
-
-Open a terminal inside your rosject and execute the following commands **in order**:
-
-```bash
-cd ~/catkin_ws/src
-git clone https://github.com/andreikotkov/Mission_Coordination_project.git
-
-cd ~/catkin_ws
-catkin_make
-source ~/catkin_ws/devel/setup.bash
-```
-
----
-
-## 📁 Project Structure
-
-```text
-Mission_Coordination_project/
-├── evry_project_description/
-│   └── launch/
-│       └── simu_robot.launch
-│
-├── evry_project_strategy/
-│   ├── nodes/
-│   └── launch/
-```
-
-- **Strategy nodes:**  
-  `~/catkin_ws/src/Mission_Coordination_project/evry_project_strategy/nodes`
-
-- **Launch files:**  
-  `~/catkin_ws/src/Mission_Coordination_project/evry_project_strategy/launch`
-
----
-
-## 🚀 Running the Simulation
-
-### Launch Gazebo
-
-```bash
-roslaunch evry_project_description simu_robot.launch
-```
-
----
-
-### Launch a Strategy
-
-Available strategies:
-- `agent_robust.launch`
-- `agent_coord.launch`
-- `agent_apf.launch`
-
-Choose the number of robots (**1 to 3**):
-
-```bash
-roslaunch evry_project_strategy <strategy_name>.launch nbr_robot:=3
-```
-
----
-
-## ⚙️ System Configuration & Assumptions
-
--  Three unicycle robots
--  Front distance line sensor (sonar)
--  Real-time distance-to-goal feedback
--  Environment with real-world obstacles (buildings, trees, vehicles)
--  No prior map knowledge (pure online planning)
-
----
-
-## 🧠 Navigation Strategies
-
----
-
-## 1) Reactive Distance Minimization (agent_robust.py)
-
-A purely reactive navigation strategy based on distance reduction.
-
-### Description
-- The robot does not compute the goal position
-- It attempts to reduce the distance to the goal
-- If the distance increases, the robot rotates and retries
-- When an obstacle is detected, the robot rotates until free space is found
-
-### Characteristics
-- Simple and robust
-- No geometric reasoning
-- Non-optimal paths
-
-### Results
-
-<video src="videos/robust.mp4" controls width="800"></video>
-
-
----
-
-## 2) Goal-Oriented Geometric Navigation (agent_coord.py)
-
-A deterministic strategy based on explicit goal localization.
-
-### Description
-- The absolute goal position (x, y) is computed at startup
-- The robot continuously aligns toward the goal
-- Forward motion follows the shortest geometric path
-
-### Obstacle Avoidance
-1. **Avoid Turn** – rotate away from the goal by a minimal safe angle  
-2. **Avoid Straight** – move straight for a short distance to bypass the obstacle  
-3. Re-align toward the goal and resume navigation
-
-### Characteristics
-- Directed and efficient
-- Predictable motion
-- Limited adaptability in dense environments
-
-### Results
-
-<video src="videos/coord.mp4" controls width="800"></video>
+This project implements various coordination and navigation strategies for a multi-robot system in a simulated environment using ROS 1 and Gazebo. The goal is to coordinate three autonomous robots to reach their respective flags while avoiding static obstacles (buildings, bus, tower) and preventing dynamic collisions at a central intersection.
 
 
 
 ---
 
-## 3) Priority-Based Coordination Strategy (agent_priority.py)
+## 📌 Project Structure
 
-A decentralized multi-robot coordination strategy based on peer-to-peer communication and priority rules.
+The repository contains the following key components:
 
-### Method
-- Decentralized robot-to-robot communication
-- Each robot subscribes to the positions of other robots
-- No centralized controller is required
+* **`evry_project_description/`**: Defines the simulation environment and resources.
+* **`worlds/`**: Contains the world files (e.g., `lev1.world`) defining the layout.
+* **`models/`**: Custom Gazebo models added for this project (e.g., specific obstacles like the bus and tower structures) to create a robust testing environment.
+* **`evry_project_strategy/`**: Contains the Python scripts implementing different navigation strategies.
+    * `nodes/agent.py`: Baseline strategy (Timing-based).
+    * `nodes/agent_robust.py`: Reactive avoidance using FSM.
+    * `nodes/agent_coord.py`: Geometric coordination with bypass maneuvers.
+    * `nodes/agent_priority.py`: Decentralized priority-based traffic control.
+    * `nodes/agent_apf.py`: Artificial Potential Fields (APF) for smooth navigation.
+* **`launch/`**: Launch files to execute the strategies.
 
-### Coordination Logic
-- A **Critical Zone** with a radius of 3 meters is defined at the environment center
-- Each robot is assigned a **priority level** based on its ID  
-  (lower ID → higher priority)
-- If a higher-priority robot enters the Critical Zone:
-  - Lower-priority robots **yield**
-  - Yielding robots stop or wait until the zone is cleared
-- Once the zone is free, waiting robots resume navigation
+---
 
-### Characteristics
-- Robust traffic management
-- Prevents deadlocks in narrow or shared spaces
-- Handles asynchronous motion and dynamic delays well
+## 🚀 Strategies Implemented
 
+### 1. Baseline Timing (`agent.py`)
+* **Method:** PID control for motion + Static Time Delay for coordination.
+* **Logic:** Robots start at staggered intervals (0s, 2s, 4s) to avoid collision at the center.
+* **Pros/Cons:** Simple to implement but highly fragile; fails with static obstacles.
 
+### 2. Reactive Avoidance (`agent_robust.py`)
+* **Method:** Finite State Machine (GO <-> AVOID).
+* **Logic:** Stops and rotates in place when an obstacle is detected by sonar (< 4.0m).
+* **Pros/Cons:** Avoids walls but gets stuck in local minima (oscillates) against large obstacles like the bus.
 
-### Results
+### 3. Geometric Coordination (`agent_coord.py`)
+* **Method:** Odometry-based Bypass Maneuver.
+* **Logic:** Calculates absolute goal coordinates. Implements a "blind drive" state to physically clear the side of large obstacles before turning back to the goal.
+* **Pros/Cons:** Solves local minima; robust against large static obstacles.
 
-<video src="videos/priority.mp4" controls width="800"></video>
+### 4. Priority Coordination (`agent_priority.py`)
+* **Method:** Decentralized Peer-to-Peer Communication.
+* **Logic:** Robots subscribe to each other's positions. A "Critical Zone" (3m radius) is defined at the center. If a higher-priority robot (lower ID) is in the zone, others yield.
+* **Pros/Cons:** Robust traffic control; handles dynamic delays effectively.
+
+### 5. Artificial Potential Fields (`agent_apf.py`)
+* **Method:** Physics-based Force Summation.
+* **Logic:** Robot moves based on the sum of Attractive Forces (to goal) and Repulsive Forces (from obstacles).
+* **Pros/Cons:** Smooth, continuous paths; efficient but requires careful tuning of force constants.
+
 
 
 ---
 
+## 🛠️ Installation & Usage
 
-## 4) Geometrically-Aware Artificial Potential Field (agent_apf.py)
+### Prerequisites
+* **ROS Noetic** (or compatible ROS 1 distribution)
+* **Gazebo Simulator**
+* **Python 3** with `rospy`
 
-An advanced navigation method based on Artificial Potential Fields with geometry awareness.
+### Setup
 
-### Description
-- The robot is modeled as a square, not a point
-- A virtual safety buffer protects robot corners
-- Prevents wall clipping during rotations
+1.  **Clone this repository** into your catkin workspace `src` folder:
+    ```bash
+    cd ~/catkin_ws/src
+    git clone https://github.com/andreikotkov/Mission_Coordination_project.git
+    ```
+    
+2.  **Build the workspace**:
+    ```bash
+    cd ~/catkin_ws
+    catkin_make
+    source devel/setup.bash
+    ```
 
-### Forces
-- **Attractive force** pulls the robot toward the goal
-- **Repulsive force** pushes the robot away from obstacles
+3.  **Make Python scripts executable**:
+    ```bash
+    cd src/Mission_Coordination_project/evry_project_strategy/nodes
+    chmod +x *.py
+    ```
 
-### Characteristics
-- Smooth and realistic motion
-- Strong obstacle avoidance
-- Geometry-safe navigation
+### Running the Simulation
 
-### Results
+1.  **Launch the Environment:**
+    Open a terminal and run the following command to start the Gazebo simulation with the robots and custom obstacles:
+    ```bash
+    roslaunch evry_project_description simu_robot.launch
+    ```
 
-<video src="videos/apf.mp4" controls width="800"></video>
-
-### Tactical Retreat and Scan Logic
-
-To handle complex traps (e.g., trees or blind corners), the strategy implements a **Tactical Retreat and Scan** mechanism:
-1. **Critical Reverse**  
-   If the robot gets dangerously close to an obstacle (< 0.9 m), it immediately stops and reverses in a straight line to regain maneuvering space.
-
-2. **Scan and Search**  
-   The robot rotates in place (ignoring the goal direction) until the sensor detects a sufficiently open path (> 3.5 m).
-
-3. **Clearance Enforcement**  
-   After dodging, the robot forces a short forward motion to ensure the robot’s body fully clears the obstacle.
-
-
-<video src="videos/apf_cut.mp4" controls width="800"></video>
-
-## 📊 Strategy Comparison
-
-| Strategy | Goal Knowledge | Geometry Awareness | Coordination | Path Quality | Robustness |
-|--------|----------------|-------------------|--------------|--------------|------------|
-| agent_robust.py | Distance only | No | No | Low | High (simple logic) |
-| agent_coord.py | Full (x, y) | No | No | Medium | Medium |
-| agent_priority.py | Full (x, y) | No | Yes (P2P) | Medium | High |
-| agent_apf.py | Full (x, y) | Yes | No | High | High |
-
+2.  **Launch the Strategy:**
+    In a separate terminal, launch the robust strategy for all 3 robots:
+    ```bash
+    roslaunch evry_project_strategy agent_robust.launch nbr_robot:=3
+    ```
+    *(Note: You can modify the launch file to point to other strategies, such as `agent_priority.py` or `agent_coord.py`)*
 
 ---
 
+## 👥 Contributors
 
-
-
-## 👤 Authors
-
-**Andrei Kotkov**  
-GitHub: https://github.com/andreikotkov
-
-**Batuhan Iriol**
-
-GitHub: https://github.com/batuhaniriol
+* Batuhan IRIOL
+* Andrei KOTKOV
