@@ -69,7 +69,7 @@ Available strategies:
 - `agent_apf.launch`
 - `agent_priority.launch`
 
-Choose the number of robots (**1 to 4**):
+Choose the number of robots (**1 to 3**):
 
 ```bash
 roslaunch evry_project_strategy <strategy_name>.launch nbr_robot:=3
